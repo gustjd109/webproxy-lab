@@ -11,9 +11,13 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+// 숙제 문제 11.11 : serve_static() 함수에 method 포인터 변수 추가
+// void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, int filesize, char *method);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+// 숙제 문제 11.11 : serve_static() 함수에 method 포인터 변수 추가
+// void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 
 int main(int argc, char **argv) {
@@ -53,7 +57,9 @@ void doit(int fd)
   printf("Request headers:\n");
   printf("%s", buf);
   sscanf(buf, "%s %s %s", method, uri, version);
-  if(strcasecmp(method, "GET")) {
+  // 숙제 문제 11.11 : doit() 함수에서 HEAD 메서드도 받을 수 있도록 추가
+  // if(strcasecmp(method, "GET")) {
+  if(!(strcasecmp(method, "GET") == 0 || strcasecmp(method, "HEAD") == 0)) {
     clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
     return;
   }
@@ -71,14 +77,18 @@ void doit(int fd)
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
       return;
     }
-    serve_static(fd, filename, sbuf.st_size);
+    // 숙제 문제 11.11 : serve_static() 함수 수행 시, method 포인터 변수 인자 추가
+    // serve_static(fd, filename, sbuf.st_size);
+    serve_static(fd, filename, sbuf.st_size, method);
   }
   else { /* Serve dynamic content */
     if(!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
       return;
     }
-    serve_dynamic(fd, filename, cgiargs);
+    // 숙제 문제 11.11 : serve_static() 함수 수행 시, method 포인터 변수 인자 추가
+    // serve_dynamic(fd, filename, cgiargs);
+    serve_dynamic(fd, filename, cgiargs, method);
   }
 }
 
@@ -141,7 +151,9 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
   }
 }
 
-void serve_static(int fd, char *filename, int filesize)
+// 숙제 문제 11.11 : serve_static() 함수에서 method 포인터 변수를 인자로 받을 수 있도록 추가
+// void serve_static(int fd, char *filename, int filesize)
+void serve_static(int fd, char *filename, int filesize, char *method)
 {
   int srcfd;
   char *srcp, filetype[MAXLINE],buf[MAXBUF];
@@ -157,7 +169,20 @@ void serve_static(int fd, char *filename, int filesize)
   printf("Response headers : \n");
   printf("%s", buf);
 
+  // 숙제 문제 11.11 : 인자로 method를 받도록 해주고, method가 HEAD일 경우 리턴(방법 1)
+  if(strcasecmp(method, "HEAD") == 0)
+    return;
+
   /* Send response body to client */
+  // 숙제 문제 11.11 : 인자로 method를 받도록 해주고, method가 GET일 때만 response body를 보낼 수 있도록 조건문 추가(방법 2)
+  // if(strcasecmp(method, "GET") == 0) {
+  //   srcfd = Open(filename, O_RDONLY, 0);
+  //   srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  //   Close(srcfd);
+  //   Rio_writen(fd, srcp, filesize);
+  //   Munmap(srcp, filesize);
+  // }
+
   srcfd = Open(filename, O_RDONLY, 0);
   srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
   Close(srcfd);
@@ -182,7 +207,9 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "text/plain");
 }
 
-void serve_dynamic(int fd, char *filename, char *cgiargs)
+// 숙제 문제 11.11 : serve_static() 함수에서 method 포인터 변수를 인자로 받을 수 있도록 추가
+// void serve_dynamic(int fd, char *filename, char *cgiargs)
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method)
 {
   char buf[MAXLINE], *emptylist[] = { NULL };
 
@@ -195,6 +222,8 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
   if(Fork() == 0) { /* Child */
     /* Real server would set all CGI vars here */
     setenv("QUERY_STRING", cgiargs, 1);
+    // 숙제 문제 11.11 : 요청 메서드를 cgi-bin/head-adder.c에 넘겨주기 위해 환경변수 추가
+    setenv("QUERY_METHOD", method, 1);
     Dup2(fd, STDOUT_FILENO);                /* Redirect stdout to client */
     Execve(filename, emptylist, environ);   /* Run CGI program */
   }
