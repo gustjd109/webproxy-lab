@@ -148,7 +148,7 @@ void serve_static(int fd, char *filename, int filesize)
 
   /* Send response headers to client */
   get_filetype(filename, filetype);
-  sprintf(buf, "HTTP/1.0 200 OK\r\n");
+  sprintf(buf, "HTTP/1.1 200 OK\r\n");
   sprintf(buf, "%sServer : Tiny Web Server\r\n", buf);
   sprintf(buf, "%sConnection : close\r\n", buf);
   sprintf(buf, "%sContent-length : %d\r\n", buf, filesize);
@@ -178,6 +178,9 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "image/png");
   else if(strstr(filename, ".jpg"))
     strcpy(filetype, "image/jpg");
+  // 숙제 문제 11.7 : Tiny를 확장해서 MPG 비디오 파일 처리하기 위한 코드 추가
+  else if(strstr(filename, ".mp4"))
+    strcpy(filetype, "video/mp4");
   else
     strcpy(filetype, "text/plain");
 }
