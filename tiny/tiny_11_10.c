@@ -1,6 +1,6 @@
 /* $begin tinymain */
 /*
- * tiny_11_9.c - A simple, iterative HTTP/1.0 Web server that uses the
+ * tiny.c - A simple, iterative HTTP/1.0 Web server that uses the
  *     GET method to serve static and dynamic content.
  *
  * Updated 11/2019 droh
@@ -124,7 +124,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
     strcpy(filename, ".");
     strcat(filename, uri);
     if(uri[strlen(uri) - 1] == '/')
-      strcat(filename, "home.html");
+      strcat(filename, "form-adder.html");
     return 1;
   }
   else { /* Dynamic content */
@@ -158,15 +158,11 @@ void serve_static(int fd, char *filename, int filesize)
   printf("%s", buf);
 
   /* Send response body to client */
-  // 숙제 문제 11.9 : 정적 컨텐츠를 처리할 때 요청한 파일을 mmap과 rio_readn 대신에 malloc, rio_readn, rio_writen을 사용해서 연결 식별자에게 복사 처리 추가
   srcfd = Open(filename, O_RDONLY, 0);
-  // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
-  srcp = (char*)Malloc(filesize);
-  Rio_readn(srcfd, srcp, filesize);
+  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
   Close(srcfd);
   Rio_writen(fd, srcp, filesize);
-  // Munmap(srcp, filesize);
-  free(srcp);
+  Munmap(srcp, filesize);
 }
 
 /*
@@ -182,9 +178,6 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "image/png");
   else if(strstr(filename, ".jpg"))
     strcpy(filetype, "image/jpg");
-  // 숙제 문제 11.7 : MPG 비디오 파일 처리 추가
-  else if(strstr(filename, ".mp4"))
-    strcpy(filetype, "video/mp4");
   else
     strcpy(filetype, "text/plain");
 }
