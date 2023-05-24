@@ -1,6 +1,6 @@
 /* $begin tinymain */
 /*
- * tiny_11_9.c - A simple, iterative HTTP/1.0 Web server that uses the
+ * tiny.c - A simple, iterative HTTP/1.0 Web server that uses the
  *     GET method to serve static and dynamic content.
  *
  * Updated 11/2019 droh
@@ -11,9 +11,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, int filesize, char *method); // 숙제 문제 11.11 : serve_static() 함수에 method 포인터 변수 추가
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method); // 숙제 문제 11.11 : serve_static() 함수에 method 포인터 변수 추가
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 
 /* port 번호를 인자로 받아 클라이언트의 요청이 올 때마다 새로 연결 소켓을 만들어 doit() 함수를 호출 */
@@ -69,8 +69,9 @@ void doit(int fd)
   printf("%s", buf); // 요청 라인 buf = "GET /godzilla.gif HTTP/1.1\0"을 표준 출력만 수행
   sscanf(buf, "%s %s %s", method, uri, version); // buf에서 문자열 3개를 읽어와 method, uri, version이라는 문자열에 저장
 
-  // 요청 method가 GET이 아니면 종료하고, main으로 가서 연결 닫고 다음 요청 대기
-  if(strcasecmp(method, "GET")) { // method 스트링이 GET이 아니면 0이 아닌 값이 나옴
+  // 요청 method가 GET과 HEAD가 아니면 종료하고, main으로 가서 연결 닫고 다음 요청 대기
+  // 숙제 문제 11.11 : doit() 함수에서 HEAD 메서드도 받을 수 있도록 추가
+  if(!(strcasecmp(method, "GET") == 0 || strcasecmp(method, "HEAD") == 0)) { // method 스트링이 GET이 아니면 0이 아닌 값이 나옴
     clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
     return;
   }
@@ -94,14 +95,16 @@ void doit(int fd)
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
       return;
     }
-    serve_static(fd, filename, sbuf.st_size); // 정적 서버에 파일의 사이즈와 메서드를 같이 전송 -> Response header에 Content-length 위해
+    // 숙제 문제 11.11 : serve_static() 함수 수행 시, method 포인터 변수 인자 추가
+    serve_static(fd, filename, sbuf.st_size, method); // 정적 서버에 파일의 사이즈와 메서드를 같이 전송 -> Response header에 Content-length 위해
   }
   else { /* Serve dynamic content */
     if(!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { // !(일반 파일이다) or !(실행 권한이 있다)
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
       return;
     }
-    serve_dynamic(fd, filename, cgiargs); // 동적 서버에 인자와 메서드를 같이 전송
+    // 숙제 문제 11.11 : serve_static() 함수 수행 시, method 포인터 변수 인자 추가
+    serve_dynamic(fd, filename, cgiargs, method); // 동적 서버에 인자와 메서드를 같이 전송
   }
 }
 
@@ -178,7 +181,8 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 
 /* 클라이언트가 원하는 정적 컨텐츠 디렉토리를 받아오고, 응답 라인과 헤더를 작성하고 서버에게 보낸다. */
 /* 그 후 정적 컨텐츠 파일을 읽어 그 응답 본문을 클라이언트에 보낸다. */
-void serve_static(int fd, char *filename, int filesize)
+// 숙제 문제 11.11 : serve_static() 함수에서 method 포인터 변수를 인자로 받을 수 있도록 추가
+void serve_static(int fd, char *filename, int filesize, char *method)
 {
   int srcfd;
   char *srcp, filetype[MAXLINE],buf[MAXBUF];
@@ -194,14 +198,26 @@ void serve_static(int fd, char *filename, int filesize)
   printf("Response headers : \n");
   printf("%s", buf);
 
+  // 숙제 문제 11.11 : 인자로 method를 받도록 해주고, method가 HEAD일 경우 리턴(방법 1)
+  if(strcasecmp(method, "HEAD") == 0)
+    return; // 응답 본문을 전송하지 않음
+
+  /* Send response body to client */
+  // 숙제 문제 11.11 : 인자로 method를 받도록 해주고, method가 GET일 때만 response body를 보낼 수 있도록 조건문 추가(방법 2)
+  // if(strcasecmp(method, "GET") == 0) {
+  //   srcfd = Open(filename, O_RDONLY, 0);
+  //   srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  //   Close(srcfd);
+  //   Rio_writen(fd, srcp, filesize);
+  //   Munmap(srcp, filesize);
+  // }
+
   /* 클라이언트에게 응답 본문 전송 */
-  // 숙제 문제 11.9 : 정적 컨텐츠를 처리할 때 요청한 파일을 mmap과 rio_readn 대신에 malloc, rio_readn, rio_writen을 사용해서 연결 식별자에게 복사 처리 추가
-  srcfd = Open(filename, O_RDONLY, 0); // 파일 열기
-  srcp = (char*)Malloc(filesize);      // 파일을 위한 메모리 할당
-  Rio_readn(srcfd, srcp, filesize);    // 읽기
-  Close(srcfd);                        // 파일 디스크립터 닫기
-  Rio_writen(fd, srcp, filesize);      // 파일 내용을 클라이언트에게 전송(응답 본문 전송)
-  free(srcp);                          // 매모리 할당 해제
+  srcfd = Open(filename, O_RDONLY, 0);                        // 파일 열기
+  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 파일을 가상메모리에 매핑
+  Close(srcfd);                                               // 파일 디스크립터 닫기
+  Rio_writen(fd, srcp, filesize);                             // 파일 내용을 클라이언트에게 전송(응답 본문 전송)
+  Munmap(srcp, filesize);                                     // 매핑된 가상메모리 해제
 }
 
 /* filename을 조사해 각각의 식별자에 맞는 MIME 타입을 filetype에 입력 */
@@ -215,14 +231,12 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "image/png");
   else if(strstr(filename, ".jpg"))
     strcpy(filetype, "image/jpg");
-  // 숙제 문제 11.7 : MPG 비디오 파일 처리 추가
-  else if(strstr(filename, ".mp4"))
-    strcpy(filetype, "video/mp4");
   else
     strcpy(filetype, "text/plain");
 }
 
-void serve_dynamic(int fd, char *filename, char *cgiargs)
+// 숙제 문제 11.11 : serve_static() 함수에서 method 포인터 변수를 인자로 받을 수 있도록 추가
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method)
 {
   char buf[MAXLINE], *emptylist[] = { NULL };
 
@@ -235,6 +249,7 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
   if(Fork() == 0) { // 자식 프로세스 포크
     /* Real server would set all CGI vars here */
     setenv("QUERY_STRING", cgiargs, 1);   // QUERY_STRING 환경 변수를 URI에서 추출한 CGI 인수로 설정
+    setenv("QUERY_METHOD", method, 1);    // 숙제 문제 11.11 : 요청 메서드를 cgi-bin/head-adder.c에 넘겨주기 위해 환경변수 추가
     Dup2(fd, STDOUT_FILENO);              // 자식 프로세스의 표준 출력을 클라이언트 소켓에 연결된 파일 디스크립터로 변경
     Execve(filename, emptylist, environ); // 현재 프로세스의 이미지를 filename 프로그램으로 대체
   }
