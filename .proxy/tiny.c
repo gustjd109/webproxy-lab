@@ -159,7 +159,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
     // 만약 uri뒤에 '/'이 있다면 그 뒤에 home.html을 추가
     // 내가 브라우저에 http://localhost:8000만 입력하면 바로 뒤에 '/'이 생기는데, '/' 뒤에 home.html을 붙여 해당 위치 해당 이름의 정적 컨텐츠가 출력
     if(uri[strlen(uri) - 1] == '/')
-      strcat(filename, "home_11_7.html");
+      strcat(filename, "home.html");
     return 1; // 정적 컨텐츠면 1 리턴
   }
   else { /* Dynamic content */
@@ -213,13 +213,12 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "image/png");
   else if(strstr(filename, ".jpg"))
     strcpy(filetype, "image/jpg");
-  // 숙제 문제 11.7 : MPG 비디오 파일 처리 추가
-  else if(strstr(filename, ".mp4"))
-    strcpy(filetype, "video/mp4");
   else
     strcpy(filetype, "text/plain");
 }
 
+/* 클라이언트가 원하는 동적 컨텐츠 디렉토리를 받아오고, 응답 라인과 헤더를 작성하고 서버에게 보낸다. */
+/* CGI 자식 프로세스를 fork하고 그 프로세스의 표준 출력을 클라이언트 출력과 연결한다. */
 void serve_dynamic(int fd, char *filename, char *cgiargs)
 {
   char buf[MAXLINE], *emptylist[] = { NULL };

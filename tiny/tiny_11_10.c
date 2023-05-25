@@ -159,7 +159,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
     // 만약 uri뒤에 '/'이 있다면 그 뒤에 home.html을 추가
     // 내가 브라우저에 http://localhost:8000만 입력하면 바로 뒤에 '/'이 생기는데, '/' 뒤에 home.html을 붙여 해당 위치 해당 이름의 정적 컨텐츠가 출력
     if(uri[strlen(uri) - 1] == '/')
-      strcat(filename, "home.html");
+      strcat(filename, "form-adder.html");
     return 1; // 정적 컨텐츠면 1 리턴
   }
   else { /* Dynamic content */
